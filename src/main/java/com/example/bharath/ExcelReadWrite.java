@@ -1,73 +1,78 @@
 package com.example.bharath;
 
-
 import com.example.bharath.interfaces.ReadWriteFunctions;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
 
-import java.sql.Connection;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.TimeUnit;
+import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.concurrent.*;
 
 public class ExcelReadWrite implements ReadWriteFunctions {
-    private final Connection conn;
-    private final PostgresDb db;
+    private final DbFunctions dbFunctions;
     private final Sheet sheet;
     private static final int THREAD_POOL_COUNT = Runtime.getRuntime().availableProcessors();
 
-    public ExcelReadWrite(PostgresDb db, Connection conn,Sheet sheet) {
-        this.conn = conn;
-        this.db = db;
+    public ExcelReadWrite(Sheet sheet, DbFunctions dbFunctions) {
         this.sheet = sheet;
-
+        this.dbFunctions = dbFunctions;
     }
 
 
     public void writeDataWithoutThread() {
         System.out.println("Writing Data Without Thread ...");
         long startTime = System.currentTimeMillis();
-        try {
-            for (Row row : sheet) {
-                db.insertRow(conn,row.getRowNum(), sheet);
+        for (Row row : sheet) {
+            if (row.getRowNum() != 0) {
+                dbFunctions.insertRow(row.getRowNum());
+
             }
-            long endTime = System.currentTimeMillis();
-            System.out.println("Execution time: " + (endTime - startTime) + " ms ⏰");
-        } catch (Exception e) {
-            e.printStackTrace();
         }
+        long endTime = System.currentTimeMillis();
+        System.out.println("Execution time: " + (endTime - startTime) + " ms ⏰");
     }
 
 
-    public void writeDataUsingThreadPool() {
+    public void writeDataUsingThreadPool() throws Exception {
+
         System.out.println("Writing Data With Thread ...");
         long startTime = System.currentTimeMillis();
 
         ExecutorService executorService = Executors.newFixedThreadPool(THREAD_POOL_COUNT);
+        List<Future<?>> futures = new ArrayList<>();
+
         final int rowCount = sheet.getLastRowNum() + 1;
 
-        for (int i = 0; i < rowCount; i++) {
+
+        for (int i = 1; i < rowCount; i++) {
             final int rowId = i;
-            executorService.submit(() -> db.insertRow(conn,rowId, sheet));
+        Future<?> future  =   executorService.submit(() -> {
+                    dbFunctions.insertRow(rowId);
+            });
+
+            futures.add(future);
+
         }
+
+        for (Future<?> future : futures) {
+         future.get();// Blocks until the task is complete and returns the result
+        }
+
+
         executorService.shutdown();
 
-        try {
-            // Wait for all tasks to complete
-            boolean tasksCompleted = executorService.awaitTermination(10, TimeUnit.MINUTES);
 
-            if (tasksCompleted) {
-                long endTime = System.currentTimeMillis();
-                System.out.println("Execution time : " + (endTime - startTime) + " ms ⏰ ");
-            } else {
-                System.out.println("Timeout occurred before all tasks completed.");
-            }
+        // Wait for all tasks to complete
+        boolean tasksCompleted = executorService.awaitTermination(10, TimeUnit.MINUTES);
 
-        } catch (InterruptedException e) {
-            e.printStackTrace();
+        if (tasksCompleted) {
+            long endTime = System.currentTimeMillis();
+            System.out.println("Execution time : " + (endTime - startTime) + " ms ⏰ ");
+        } else {
+            System.out.println("Timeout occurred before all tasks completed.");
         }
     }
-
 
 
 }
