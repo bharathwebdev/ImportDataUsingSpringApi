@@ -1,13 +1,9 @@
 package com.example.bharath;
 
-import com.example.bharath.response.Data;
-import com.example.bharath.response.ErrorResponse;
-import com.example.bharath.response.Response;
-import com.example.bharath.response.SuccessResponse;
+import com.example.bharath.response.*;
 import org.apache.poi.ss.usermodel.Sheet;
 import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
-import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
@@ -15,10 +11,11 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.util.Collections;
 
+
 @Component
-public class GetExcelDataAndImport<T> {
+public class GetExcelDataAndImport {
     private Integer totalRow;
-    DbFunctions dbFunctions;
+    private final DbFunctions dbFunctions;
 
     public GetExcelDataAndImport(DbFunctions dbFunctions) {
         this.dbFunctions = dbFunctions;
@@ -26,7 +23,11 @@ public class GetExcelDataAndImport<T> {
 
 
     public ResponseEntity<Object> importData(MultipartFile file, Boolean thread, String version) {
-        Response response;
+
+        SuccessResponse successResponse;
+
+        ErrorResponse errorResponse;
+
         try (Workbook workbook = new XSSFWorkbook(file.getInputStream())) {
 
             Sheet sheet = workbook.getSheetAt(0);
@@ -35,75 +36,83 @@ public class GetExcelDataAndImport<T> {
             dbFunctions.createTableAndFieldDynamically(workbook);
             ExcelReadWrite wr = new ExcelReadWrite(sheet, dbFunctions);
 
+
             try {
-                if (thread) {
+
+                if ((Boolean.TRUE.equals(thread))) {
                     wr.writeDataUsingThreadPool();
                 } else {
                     wr.writeDataWithoutThread();
                 }
 
-                response = new SuccessResponse();
-                if (version.equals("v2")) {
-                    response.setStatus("success");
-                    response.setMessage("Data imported successfully");
-                    response.setTotalRecords(totalRow);
-                    ((SuccessResponse) response).setData(new Data("Data imported successfully", totalRow));
 
+                successResponse = new SuccessResponse();
+
+                if (version.equals("v2")) {
+                    successResponse = createSuccessResponse(totalRow);
+                    successResponse.setData(new Data(Constants.SUCCESS_IMPORT, totalRow));
                 }
+
 
             } catch (Exception e) {
 
                 e.printStackTrace();
-                response = new ErrorResponse();
+                errorResponse = createErrorResponse(e);
+
                 if (version.equals("v2")) {
-                    if (e.getMessage().contains("column") && e.getMessage().contains("does not exist")) {
-
-                        response.setStatus("error");
-                        response.setMessage("Failed to import data");
-                        ((ErrorResponse) response).setErrors(Collections.singletonList("Invalid column name in the Excel sheet"));
-
-                    } else {
-                        response.setStatus("error");
-                        response.setMessage("Failed to import data");
-                        ((ErrorResponse) response).setErrors(Collections.singletonList(e.getMessage()));
-                        response.setTotalRecords(totalRow);
-                    }
-
-                    return new ResponseEntity<>(response, HttpStatus.INTERNAL_SERVER_ERROR);
+                    return new ResponseEntity<>(errorResponse, HttpStatus.CONFLICT);
                 } else if (version.equals("v1")) {
-                    return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(e.getMessage());
+                    return ResponseEntity.status(HttpStatus.CONFLICT).body(e.getMessage());
                 } else {
-                    return ResponseEntity.status(HttpStatus.NOT_FOUND).body("page not Found");
+                    return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Constants.NOT_FOUND);
                 }
+
             }
+
 
         } catch (Exception e) {
-
             e.printStackTrace();
-            response = new ErrorResponse();
+            errorResponse = createErrorResponse(e);
             if (version.equals("v2")) {
-
-                response.setStatus("error");
-                response.setMessage("Failed to import data");
-                ((ErrorResponse) response).setErrors(Collections.singletonList(e.getMessage()));
-                return new ResponseEntity<>(response, HttpStatus.INTERNAL_SERVER_ERROR);
+                return new ResponseEntity<>(errorResponse, HttpStatus.CONFLICT);
             } else if (version.equals("v1")) {
-                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(e.getMessage());
+                return ResponseEntity.status(HttpStatus.CONFLICT).body(e.getMessage());
             } else {
-                return ResponseEntity.status(HttpStatus.NOT_FOUND).body("page not Found");
+                return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Constants.NOT_FOUND);
             }
-
-
         }
+
+
         if (version.equals("v2")) {
-            return new ResponseEntity<>(response, HttpStatus.OK);
+            return new ResponseEntity<>(successResponse, HttpStatus.CREATED);
         } else if (version.equals("v1")) {
-            return ResponseEntity.status(HttpStatus.OK).body("Data imported successfully .");
+            return ResponseEntity.status(HttpStatus.CREATED).body(Constants.SUCCESS_IMPORT);
         } else {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("page not Found");
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Constants.NOT_FOUND);
         }
 
 
+    }
+
+    private SuccessResponse createSuccessResponse(Integer totalRow) {
+        SuccessResponse response = new SuccessResponse();
+        response.setStatus(Constants.SUCCESS);
+        response.setMessage(Constants.SUCCESS_IMPORT);
+        response.setTotalRecords(totalRow);
+        return response;
+    }
+
+
+    private ErrorResponse createErrorResponse(Exception e) {
+        ErrorResponse response = new ErrorResponse();
+        response.setStatus(Constants.ERROR);
+        response.setErrors(Collections.singletonList(e.getMessage()));
+        if (e.getMessage().contains("column") && e.getMessage().contains("does not exist")) {
+            response.setErrors(Collections.singletonList("Invalid column name in the Excel sheet"));
+        } else {
+            response.setErrors(Collections.singletonList(e.getMessage()));
+        }
+        return response;
     }
 
 

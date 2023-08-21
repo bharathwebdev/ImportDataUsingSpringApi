@@ -1,0 +1,38 @@
+server:
+  port: 8443
+  ssl:
+    key-store: classpath:keystore.p12
+    key-store-password: 123456
+    keyStoreType: PKCS12
+    keyAlias: myapp
+    enabled: true
+
+jwt:
+  SECRET_KEY: 6161d296ef83c97ce8bf20657b80e944ce46470cdb7b2a70251ff402ffdc17e4
+
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/exceldata2
+    username: postgres
+    password: 1811786
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 10MB
+  jpa:
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+    hibernate:
+      ddl-auto: update
+    property:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
+
+  main:
+    web-application-type: servlet
+  mvc:
+    cors:
+      allowed-origins: "https://localhost:3000"
+      allowed-methods: "GET,POST"
+      allowed-headers: "Content-Type,Authorization"
+      allow-credentials: true
