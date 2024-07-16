@@ -89,8 +89,8 @@ private static  final String[] REGEXWHITELIST = {
 
                 .sessionManagement(a->
                         a.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
-
                 )
+
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
                 .cors(a->a.configurationSource(corsConfigurationSource()));
 

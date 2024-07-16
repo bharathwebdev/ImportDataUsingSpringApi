@@ -110,6 +110,8 @@ public class ResponseV2 {
                 cookie.setHttpOnly(true);
                 cookie.setPath("/");
                 cookie.setMaxAge(1800000);
+
+
 //                cookie.setSecure(true);
 
                 // Make sure the cookie is only sent over HTTPS connections
@@ -131,8 +133,8 @@ public class ResponseV2 {
                 successResponse.setStatus("success");
                 successResponse.setData(responseService);
                 response = ResponseEntity.status(200).body(successResponse);
-
             }
+
         }catch (ExpiredJwtException e){
             e.printStackTrace();
             System.out.println("Token Expired : "+e);
